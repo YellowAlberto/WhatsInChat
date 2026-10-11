@@ -69,3 +69,41 @@ def procesar_chat_whatsapp(contenido_bytes):
         datos.append(mensaje_actual)
 
     return pd.DataFrame(datos)
+
+
+_RE_FECHA = re.compile(r'(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4})')
+_RE_HORA = re.compile(r'(\d{1,2}):(\d{2})(?::(\d{2}))?\s?([AaPp])?')
+
+
+def convertir_fechas(df):
+    """Devuelve una Serie de datetime a partir de las columnas 'Fecha' y 'Hora'.
+
+    No se deja que pandas "adivine" fecha a fecha: con `format='mixed'` un
+    "05/03/2024" se leía como 3 de mayo aunque el chat fuera dd/mm. Aquí se
+    mira el chat entero: si algún primer número pasa de 12 es que va primero el
+    día; si lo pasa algún segundo número, va primero el mes. Si ninguno lo
+    pasa (ambiguo) se asume día/mes, que es lo habitual en español.
+    Las filas que no se puedan leer quedan como NaT."""
+    f = df['Fecha'].astype(str).str.extract(_RE_FECHA).astype(float)
+    h = df['Hora'].astype(str).str.extract(_RE_HORA)
+
+    primero, segundo = f[0], f[1]
+    mes_primero = (not (primero > 12).any()) and bool((segundo > 12).any())
+    dia = segundo if mes_primero else primero
+    mes = primero if mes_primero else segundo
+
+    anio = f[2]
+    anio = anio.where(anio >= 100, anio + 2000)
+
+    hora = h[0].astype(float)
+    minuto = h[1].astype(float)
+    segundo_h = h[2].astype(float).fillna(0)
+    sufijo = h[3].str.lower()
+    hora = hora.where(~((sufijo == 'p') & (hora < 12)), hora + 12)
+    hora = hora.where(~((sufijo == 'a') & (hora == 12)), 0)
+
+    return pd.to_datetime(
+        pd.DataFrame({'year': anio, 'month': mes, 'day': dia,
+                      'hour': hora, 'minute': minuto, 'second': segundo_h}),
+        errors='coerce',
+    )

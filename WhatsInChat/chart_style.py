@@ -187,9 +187,10 @@ def piruletas(df, col_valor, col_categoria, titulo, subtitulo=None, hover=None, 
 
 
 def mapa_calor(z, x, y, titulo, hover, subtitulo=None, texto=None, altura=None, margen=None,
-               titulo_x=None, dtick_x=None, tickangle_x=None):
+               titulo_x=None, dtick_x=None, tickangle_x=None, rango_x=None):
     """Mapa de calor sin barra de color, con celdas separadas y filas de arriba
-    a abajo en el orden recibido."""
+    a abajo en el orden recibido. Los ejes quedan fijos (sin zoom ni arrastre):
+    así nunca se ven horas o días que no existen al alejar la vista."""
     fig = go.Figure(go.Heatmap(
         z=z, x=x, y=y, colorscale=ESCALA_CALOR_OSCURO, showscale=False,
         xgap=3, ygap=3, hoverongaps=False, hovertemplate=hover,
@@ -197,7 +198,9 @@ def mapa_calor(z, x, y, titulo, hover, subtitulo=None, texto=None, altura=None, 
         textfont=dict(size=11),
     ))
     _aplicar_estilo(fig, titulo, subtitulo, altura, margen)
-    xaxis = dict(showline=False, showgrid=False, ticks="", automargin=True)
+    xaxis = dict(showline=False, showgrid=False, ticks="", automargin=True, fixedrange=True)
+    if rango_x:
+        xaxis["range"] = list(rango_x)
     if titulo_x:
         xaxis["title"] = dict(text=titulo_x, font=dict(size=12))
     if dtick_x:
@@ -205,5 +208,6 @@ def mapa_calor(z, x, y, titulo, hover, subtitulo=None, texto=None, altura=None, 
     if tickangle_x is not None:
         xaxis["tickangle"] = tickangle_x
     fig.update_xaxes(**xaxis)
-    fig.update_yaxes(autorange="reversed", showline=False, showgrid=False, ticks="", automargin=True)
+    fig.update_yaxes(autorange="reversed", showline=False, showgrid=False, ticks="", automargin=True,
+                     fixedrange=True)
     return fig

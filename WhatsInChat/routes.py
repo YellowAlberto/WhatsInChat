@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from .config import FRASES_MULTIMEDIA, FRASES_ELIMINADO, PATRON_EMOJI, DIAS_SEMANA_ES
-from .chat_parser import procesar_chat_whatsapp
+from .chat_parser import procesar_chat_whatsapp, convertir_fechas
 from .chart_style import (
     a_html, barras_horizontales, barras_verticales, reloj_actividad_horaria, piruletas, mapa_calor,
 )
@@ -64,11 +64,12 @@ async def inicio(request: Request):
 def ejemplo(request: Request):
     """Análisis de un chat totalmente ficticio, para ver cómo funciona sin subir nada."""
     archivo = UploadFile(file=io.BytesIO(generar_chat_demo()), filename="Chat de WhatsApp con Los Cracks (ejemplo).txt")
-    return analizar_chat(request, archivo, None)
+    return analizar_chat(request, archivo, None, None, None)
 
 
 @router.post("/analizar", response_class=HTMLResponse)
-def analizar_chat(request: Request, file: UploadFile = File(...), custom_words: str = Form(None)):
+def analizar_chat(request: Request, file: UploadFile = File(...), custom_words: str = Form(None),
+                  fecha_desde: str = Form(None), fecha_hasta: str = Form(None)):
     LIMITE_TAMANO_MB = 25
 
     # Si es un .zip (exportación de WhatsApp), se extrae solo el .txt del chat.
@@ -120,8 +121,34 @@ def analizar_chat(request: Request, file: UploadFile = File(...), custom_words: 
         )
 
     # --- PROCESAMIENTO CRONOLÓGICO Y CÁLCULOS AVANZADOS ---
-    df['Fecha_Completa'] = pd.to_datetime(df['Fecha'] + ' ' + df['Hora'], format='mixed', errors='coerce')
+    df['Fecha_Completa'] = convertir_fechas(df)
     df = df.dropna(subset=['Fecha_Completa']).sort_values('Fecha_Completa').reset_index(drop=True)
+
+    # Filtro opcional por fechas (los <input type="date"> mandan AAAA-MM-DD).
+    # Ambos extremos son inclusivos y cualquiera de los dos puede quedar vacío.
+    desde = pd.to_datetime(fecha_desde, format='%Y-%m-%d', errors='coerce') if fecha_desde else pd.NaT
+    hasta = pd.to_datetime(fecha_hasta, format='%Y-%m-%d', errors='coerce') if fecha_hasta else pd.NaT
+    if pd.notna(desde) and pd.notna(hasta) and desde > hasta:
+        desde, hasta = hasta, desde
+    filtro_fechas = None
+    if pd.notna(desde) or pd.notna(hasta):
+        if pd.notna(desde):
+            df = df[df['Fecha_Completa'] >= desde]
+        if pd.notna(hasta):
+            df = df[df['Fecha_Completa'] < hasta + pd.Timedelta(days=1)]
+        df = df.reset_index(drop=True)
+        if df.empty:
+            return templates.TemplateResponse(
+                name="error.html",
+                context={"mensaje": "No hay mensajes en el rango de fechas que has elegido. "
+                                     "Prueba con otro rango o quita el filtro para analizar el chat entero."},
+                request=request,
+                status_code=400,
+            )
+        filtro_fechas = {
+            "desde": desde.strftime('%d/%m/%Y') if pd.notna(desde) else None,
+            "hasta": hasta.strftime('%d/%m/%Y') if pd.notna(hasta) else None,
+        }
     df['Hora_Int'] = df['Fecha_Completa'].dt.hour
     df['Año'] = df['Fecha_Completa'].dt.year
     df['Dia_Semana_Num'] = df['Fecha_Completa'].dt.dayofweek  # 0 = Lunes
@@ -360,7 +387,7 @@ def analizar_chat(request: Request, file: UploadFile = File(...), custom_words: 
         titulo='Actividad por día y hora',
         hover='<b>%{y}</b><br>%{x}:00 h<br>%{z:,} mensajes<extra></extra>',
         margen=dict(t=60, b=20, l=20, r=20),
-        titulo_x='Hora del día', dtick_x=2,
+        titulo_x='Hora del día', dtick_x=2, rango_x=(-0.5, 23.5),
     )
     g7 = a_html(fig7, 'g-heatmap-semana')
     del fig7
@@ -631,6 +658,7 @@ def analizar_chat(request: Request, file: UploadFile = File(...), custom_words: 
         name="resultados.html",
         context={
             "nombre_grupo": nombre_grupo,
+            "filtro_fechas": filtro_fechas,
             "catalogo_perfiles": CATALOGO_PERFILES,
             "total_mensajes": len(df),
             "total_multimedia": total_multimedia,

@@ -133,6 +133,10 @@ body.ini {
 }
 .ini-campo::placeholder { color: var(--ini-tenue); opacity: .8; }
 .ini-campo:focus { outline: 2px solid var(--ini-acento-claro); outline-offset: 1px; border-color: transparent; }
+.ini-rango-titulo { margin-top: 1.1rem; }
+.ini-rango { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+.ini-rango .ini-campo { color-scheme: light; }
+html.dark .ini-rango .ini-campo { color-scheme: dark; }
 .ini-ayuda { margin-top: .4rem; font-size: .78rem; color: var(--ini-tenue); }
 
 /* --- Botones --- */

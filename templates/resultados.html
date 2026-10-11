@@ -284,7 +284,7 @@
         <div class="flex justify-between items-center mb-3 shrink-0">
             <div class="titulo-bloque">
                 <h1 class="titulo-grupo font-extrabold text-teal-700 dark:text-teal-400 tracking-tight" title="{{ nombre_grupo or '' }}">{{ nombre_grupo or "La radiografía de tu grupo" }}</h1>
-                <p class="subtitulo-mensajes"><strong>{{ "{:,}".format(total_mensajes) }}</strong> mensajes analizados</p>
+                <p class="subtitulo-mensajes"><strong>{{ "{:,}".format(total_mensajes) }}</strong> mensajes analizados{% if filtro_fechas %} · {% if filtro_fechas.desde and filtro_fechas.hasta %}del {{ filtro_fechas.desde }} al {{ filtro_fechas.hasta }}{% elif filtro_fechas.desde %}desde el {{ filtro_fechas.desde }}{% else %}hasta el {{ filtro_fechas.hasta }}{% endif %}{% endif %}</p>
             </div>
             <div class="flex items-center gap-2">
                 <button id="btnTema" onclick="alternarTema()" aria-label="Cambiar entre modo claro y oscuro" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full w-9 h-9 flex items-center justify-center text-base shadow hover:scale-105 transition cursor-pointer">
